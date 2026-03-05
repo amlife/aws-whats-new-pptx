@@ -61,7 +61,7 @@ if command -v git >/dev/null 2>&1; then
     echo "git clone 실패" >&2
     exit 1
   fi
-  SRC="$TMP_DIR/repo"
+  SRC="$TMP_DIR/repo/skills/$SKILL_NAME"
 else
   echo "📦 tarball로 다운로드 중..."
   TARBALL="$TMP_DIR/archive.tar.gz"
@@ -70,7 +70,7 @@ else
     exit 1
   fi
   tar xzf "$TARBALL" -C "$TMP_DIR"
-  SRC="$TMP_DIR/$SKILL_NAME-$BRANCH"
+  SRC="$TMP_DIR/$SKILL_NAME-$BRANCH/skills/$SKILL_NAME"
 fi
 
 # Verify essential files exist
