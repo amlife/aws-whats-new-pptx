@@ -1,0 +1,110 @@
+---
+name: aws-whats-new-pptx
+description: "AWS What's New 공지 URL을 입력받아 한국어 요약 + PPTX 프레젠테이션을 생성합니다. 사용자가 AWS What's New URL(https://aws.amazon.com/about-aws/whats-new/...)을 1개 이상 제공하면 자동으로 트리거됩니다. 'AWS 새 기능 발표자료 만들어줘', 'What's New 슬라이드로 정리해줘', 'AWS 공지 프레젠테이션', 'whats-new pptx' 등의 요청에도 반응합니다. AWS What's New URL이 포함된 모든 프레젠테이션 요청에 반드시 이 스킬을 사용하세요. URL이 aws.amazon.com/about-aws/whats-new/ 패턴이면 항상 트리거하세요. 사용자가 AWS 발표, 공지 요약, 새 기능 정리를 요청할 때도 이 스킬이 적합합니다."
+---
+
+# AWS What's New → PPTX 생성 스킬
+
+AWS What's New 공지 URL을 입력받아 구조화된 한국어 요약을 생성하고, 이를 기반으로 PPTX 프레젠테이션을 만듭니다.
+
+## 워크플로우 (3단계)
+
+```
+URL 입력 → ① 콘텐츠 수집 → ② 구조화 요약 → ③ PPTX 렌더링
+```
+
+### Step 1: URL 콘텐츠 수집
+
+사용자로부터 1개 이상의 AWS What's New URL을 받습니다.
+
+**URL 형식:**
+```
+https://aws.amazon.com/ko/about-aws/whats-new/YYYY/MM/slug/
+https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
+```
+
+각 URL에 대해:
+1. 한국어(`/ko/`) URL 우선 → 실패 시 영어 URL 폴백
+2. `web_fetch`로 본문 텍스트 추출
+3. 본문 내 참조 링크(공식 문서, 가격 페이지 등)도 `web_fetch`로 보강 정보 수집
+
+**MCP 도구 활용 (사용 가능한 경우):**
+- `aws___search_documentation`: 서비스/기능 관련 문서 검색
+- `aws___get_regional_availability`: 리전 가용성 확인
+- 위 도구가 없으면 `web_search`/`web_fetch`로 대체
+
+**진행 보고:**
+```
+📋 Step 1/3: URL에서 콘텐츠를 수집하고 있습니다... (N개 URL)
+  → [URL 1] Amazon ECR 교차 리포지토리 레이어 공유 ✅
+  → [URL 2] Trusted Advisor 미사용 NAT 게이트웨이 검사 ✅
+```
+
+### Step 2: 구조화 요약 생성
+
+**[references/summary-agent.md](references/summary-agent.md)를 읽고 그 지침을 정확히 따릅니다.**
+
+각 URL의 수집된 콘텐츠를 summary-agent의 규칙에 따라:
+1. 유형 판정 (T1a~T6, 우선순위 기반) → 라벨로 표기
+2. 개요 + 상세 내용 + 관련 링크 구조의 한국어 마크다운 요약 생성
+3. 자체 점검 체크리스트 수행
+
+**진행 보고:**
+```
+📝 Step 2/3: 구조화 요약을 생성하고 있습니다...
+  → [URL 1] T1a 신규 기능 추가 — 요약 완료
+  → [URL 2] T1b 기존 기능 개선 — 요약 완료
+```
+
+### Step 3: PPTX 렌더링
+
+**[references/template-spec.md](references/template-spec.md)를 읽고 템플릿 구조를 파악합니다.**
+
+기본 템플릿: `assets/whats_new_template.pptx`
+
+**슬라이드 구조:**
+- Title Slide 1장: slide1.xml 편집 (ctrTitle placeholder 텍스트 교체)
+- 콘텐츠 슬라이드 N장: slide2.xml 복제 (Title + 2행 테이블)
+
+각 URL당 1장의 콘텐츠 슬라이드를 생성합니다. 콘텐츠가 많으면 2장까지 확장 가능합니다.
+
+**렌더링 워크플로우:**
+1. `python scripts/office/unpack.py assets/whats_new_template.pptx working/`
+2. 콘텐츠 슬라이드 복제: URL 수 - 1만큼 `python scripts/add_slide.py working/ slide2.xml` 반복 (presentation.xml에 자동 등록됨)
+3. Title Slide 편집 (slide1.xml): Edit 도구로 `ctrTitle`의 `<a:t>` 교체
+   - 서브타이틀 추가 권장: "2026년 2월" 또는 "N건의 AWS 업데이트" 등 맥락 (template-spec.md의 서브타이틀 XML 참조)
+4. 각 콘텐츠 슬라이드를 `render_content.py`로 원스톱 렌더링:
+   ```bash
+   # 요약 마크다운을 stdin으로 전달 (working/ 내부에 temp 파일 생성 금지)
+   cat /tmp/content_slide2.dat | python scripts/render_content.py \
+       working/ppt/slides/slide2.xml - \
+       --title "슬라이드 제목" --header "개요" --font-size auto
+   ```
+   - `--font-size auto`: 줄 수 기반 자동 판단 (~25줄 14pt, ~35줄 12pt)
+   - 하이퍼링크: URL이 자동으로 클릭 가능한 링크로 변환됨 (`_rels` 자동 등록)
+   - `유형:` 줄: 자동 스킵됨
+5. `python scripts/clean.py working/`
+6. `python scripts/office/pack.py working/ output.pptx --original assets/whats_new_template.pptx`
+7. `rm -rf working/` — PPTX 생성 완료 후 working 디렉토리 정리
+
+**주의사항:**
+- 콘텐츠 파일은 `working/` 외부(예: `/tmp/`)에 생성 (pack.py 검증 시 "Unreferenced file" 에러 방지)
+- 슬라이드가 여러 장이면 서브에이전트로 병렬 렌더링 가능 (각 slide{N}.xml은 독립 파일)
+
+**진행 보고:**
+```
+✍️ Step 3/3: PPTX를 생성하고 있습니다...
+  → [슬라이드 1] Title Slide — 완료
+  → [슬라이드 2] 콘텐츠 (URL 1) — 완료
+  → [슬라이드 3] 콘텐츠 (URL 2) — 완료
+  → PPTX 렌더링 완료: output.pptx
+```
+
+---
+
+## 참조 파일
+
+| 파일 | 용도 | 읽는 시점 |
+|------|------|----------|
+| [references/summary-agent.md](references/summary-agent.md) | 요약 에이전트 규칙 (유형 판정 + 템플릿) | Step 2 시작 시 |
+| [references/template-spec.md](references/template-spec.md) | 템플릿 레이아웃 구조 + shape 맵 | Step 3 시작 시 |

@@ -1,0 +1,30 @@
+{
+  "skill_name": "aws-whats-new-pptx",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "https://aws.amazon.com/about-aws/whats-new/2025/01/amazon-ecr-cross-repository-layer-sharing/ 이 공지를 슬라이드로 만들어줘",
+      "expected_output": "T1a 유형 판정, 한국어 요약, 2장(Title+Content) PPTX 생성",
+      "files": [],
+      "expectations": [
+        "PPTX 파일이 생성되었다",
+        "Content QA에서 placeholder 텍스트가 없다",
+        "한국어로 작성되었다",
+        "관련 링크가 최소 2개 포함되었다",
+        "Visual QA에서 텍스트 오버플로우가 없다"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "https://aws.amazon.com/about-aws/whats-new/2025/02/amazon-trusted-advisor-unused-nat-gateway-check/ https://aws.amazon.com/about-aws/whats-new/2025/02/amazon-s3-tables-apache-iceberg-table-buckets/ 이 두 개 공지를 하나의 발표자료로 만들어줘",
+      "expected_output": "3장(Title+Content×2) PPTX 생성",
+      "files": [],
+      "expectations": [
+        "Title 슬라이드 1장 + 콘텐츠 슬라이드 2장 = 총 3장",
+        "각 슬라이드에 개별 URL의 요약이 포함되었다",
+        "각 공지의 유형이 판정되었다",
+        "pack.py 검증을 통과했다"
+      ]
+    }
+  ]
+}
