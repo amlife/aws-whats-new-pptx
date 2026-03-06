@@ -21,6 +21,7 @@ Content format:
     - empty line → blank line
     - Lines starting with "유형:" → skipped (internal metadata)
     - URLs (https://...) → clickable hyperlinks
+    - {date} placeholder in slide → replaced via --date option
 """
 
 import argparse
@@ -94,6 +95,24 @@ def determine_font_size(lines):
     return 1400  # >35 lines: use 14pt with 2-slide split (handled externally)
 
 
+def extract_date(lines):
+    """Extract and remove '게시일:' line and trailing blank line from content."""
+    date_text = None
+    remaining = []
+    skip_next_blank = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith('게시일:'):
+            date_text = stripped.replace('게시일:', '').strip()
+            skip_next_blank = True
+        elif skip_next_blank and not stripped:
+            skip_next_blank = False
+        else:
+            skip_next_blank = False
+            remaining.append(line)
+    return date_text, remaining
+
+
 def render_txbody(lines, sz):
     """Convert content lines to XML <a:txBody> for Row 1."""
     parts = ['<a:txBody><a:bodyPr/><a:lstStyle/><a:p>']
@@ -124,6 +143,10 @@ def render_txbody(lines, sz):
         else:
             parts.append(_render_line_with_links(stripped, sz, bold=False, urls=urls))
             parts.append(_br(sz))
+
+    # Remove trailing BR after last content line
+    if parts[-1].startswith('<a:br>'):
+        parts.pop()
 
     parts.append(f'<a:endParaRPr lang="ko-KR" sz="{sz}" dirty="0">{EMBER_FONTS}</a:endParaRPr>')
     parts.append('</a:p></a:txBody>')
@@ -164,6 +187,11 @@ def replace_header(slide_content, header):
     return slide_content.replace('<a:t>개요</a:t>', f'<a:t>{_escape(header)}</a:t>', 1)
 
 
+def replace_date(slide_content, date_text):
+    """Replace '{date}' placeholder in slide."""
+    return slide_content.replace('<a:t>{date}</a:t>', f'<a:t>{_escape(date_text)}</a:t>', 1)
+
+
 def register_hyperlinks(slide_xml_path, urls):
     """Add hyperlink Relationships to the slide's _rels file."""
     if not urls:
@@ -184,18 +212,25 @@ def register_hyperlinks(slide_xml_path, urls):
     rels_path.write_text(rels_content, encoding='utf-8')
 
 
-def render_slide(slide_path, lines, font_size='auto', title=None, header=None):
-    """One-shot render: title + header + Row 1 content + hyperlinks."""
+def render_slide(slide_path, lines, font_size='auto', title=None, header=None, date=None):
+    """One-shot render: title + header + date + Row 1 content + hyperlinks."""
     path = Path(slide_path)
     content = path.read_text(encoding='utf-8')
 
     sz = determine_font_size(lines) if font_size == 'auto' else int(font_size)
+
+    # Extract date from content if not explicitly provided
+    extracted_date, lines = extract_date(lines)
+    date_value = date or extracted_date
 
     if title:
         content = replace_title(content, title)
 
     if header:
         content = replace_header(content, header)
+
+    if date_value:
+        content = replace_date(content, date_value)
 
     txbody, urls = render_txbody(lines, sz)
     result = replace_row1(content, txbody)
@@ -221,6 +256,7 @@ if __name__ == '__main__':
     parser.add_argument('--header', default='개요', help='Row 0 header text (default: 개요)')
     parser.add_argument('--font-size', default='auto',
                         help='Font size: auto, 1400 (14pt), or 1200 (12pt)')
+    parser.add_argument('--date', help='Date text (replaces {date} placeholder)')
     args = parser.parse_args()
 
     if args.content_file == '-':
@@ -228,6 +264,6 @@ if __name__ == '__main__':
     else:
         lines = Path(args.content_file).read_text(encoding='utf-8').splitlines()
 
-    ok, sz = render_slide(args.slide_xml, lines, args.font_size, args.title, args.header)
+    ok, sz = render_slide(args.slide_xml, lines, args.font_size, args.title, args.header, args.date)
     if not ok:
         sys.exit(1)
