@@ -1,6 +1,6 @@
 ---
 name: aws-whats-new-pptx
-description: "AWS What's New 공지 URL을 입력받아 한국어 요약 + PPTX 프레젠테이션을 생성합니다. 사용자가 AWS What's New URL(https://aws.amazon.com/about-aws/whats-new/...)을 1개 이상 제공하면 자동으로 트리거됩니다. 'AWS 새 기능 발표자료 만들어줘', 'What's New 슬라이드로 정리해줘', 'AWS 공지 프레젠테이션', 'whats-new pptx' 등의 요청에도 반응합니다. AWS What's New URL이 포함된 모든 프레젠테이션 요청에 반드시 이 스킬을 사용하세요. URL이 aws.amazon.com/about-aws/whats-new/ 패턴이면 항상 트리거하세요. 사용자가 AWS 발표, 공지 요약, 새 기능 정리를 요청할 때도 이 스킬이 적합합니다."
+description: "AWS What's New 공지 URL을 입력받아 한국어 요약 또는 번역 + PPTX 프레젠테이션을 생성합니다. 사용자가 AWS What's New URL(https://aws.amazon.com/about-aws/whats-new/...)을 1개 이상 제공하면 자동으로 트리거됩니다. 'AWS 새 기능 발표자료 만들어줘', 'What's New 슬라이드로 정리해줘', 'AWS 공지 프레젠테이션', 'whats-new pptx' 등의 요청에도 반응합니다. '번역해줘', '원문 번역', '전문 번역' 요청 시 원문 전체를 한국어로 번역하여 슬라이드를 생성합니다. AWS What's New URL이 포함된 모든 프레젠테이션 요청에 반드시 이 스킬을 사용하세요. URL이 aws.amazon.com/about-aws/whats-new/ 패턴이면 항상 트리거하세요. 사용자가 AWS 발표, 공지 요약, 새 기능 정리, 공지 번역을 요청할 때도 이 스킬이 적합합니다."
 ---
 
 # AWS What's New → PPTX 생성 스킬
@@ -40,7 +40,13 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
   → [URL 2] Trusted Advisor 미사용 NAT 게이트웨이 검사 ✅
 ```
 
-### Step 2: 구조화 요약 생성
+### Step 2: 콘텐츠 생성 (요약 또는 번역)
+
+**모드 판단:** 사용자 요청에서 모드를 판단합니다.
+- **요약 모드 (기본)**: URL만 제공하거나 "요약", "정리", "슬라이드", "발표자료" 등의 키워드
+- **번역 모드**: "번역", "translate", "원문 번역", "전문 번역", "원문 그대로" 등의 키워드 포함 시
+
+#### 요약 모드
 
 **[references/summary-agent.md](references/summary-agent.md)를 읽고 그 지침을 정확히 따릅니다.**
 
@@ -49,11 +55,21 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
 2. 개요 + 상세 내용 + 관련 링크 구조의 한국어 마크다운 요약 생성
 3. 자체 점검 체크리스트 수행
 
+#### 번역 모드
+
+**[references/translation-agent.md](references/translation-agent.md)를 읽고 그 지침을 정확히 따릅니다.**
+
+각 URL의 수집된 콘텐츠를 translation-agent의 규칙에 따라:
+1. 원문 전체를 한국어로 번역 (원문 구조 유지, 기술 용어 병기)
+2. 자체 점검 체크리스트 수행
+
 **진행 보고:**
 ```
-📝 Step 2/3: 구조화 요약을 생성하고 있습니다...
+📝 Step 2/3: 구조화 요약을 생성하고 있습니다... (요약 모드)
   → [URL 1] T1a 신규 기능 추가 — 요약 완료
-  → [URL 2] T1b 기존 기능 개선 — 요약 완료
+
+📝 Step 2/3: 원문을 한국어로 번역하고 있습니다... (번역 모드)
+  → [URL 1] T1a 신규 기능 추가 — 번역 완료
 ```
 
 ### Step 3: PPTX 렌더링
@@ -110,5 +126,6 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
 
 | 파일 | 용도 | 읽는 시점 |
 |------|------|----------|
-| [references/summary-agent.md](references/summary-agent.md) | 요약 에이전트 규칙 (유형 판정 + 템플릿) | Step 2 시작 시 |
+| [references/summary-agent.md](references/summary-agent.md) | 요약 에이전트 규칙 (유형 판정 + 템플릿) | Step 2 시작 시 (요약 모드) |
+| [references/translation-agent.md](references/translation-agent.md) | 번역 에이전트 규칙 (원문 번역) | Step 2 시작 시 (번역 모드) |
 | [references/template-spec.md](references/template-spec.md) | 템플릿 레이아웃 구조 + shape 맵 | Step 3 시작 시 |
