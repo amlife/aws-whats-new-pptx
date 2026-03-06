@@ -160,8 +160,8 @@ def replace_title(slide_content, title):
 
 
 def replace_header(slide_content, header):
-    """Replace 'Summary' in Row 0 header."""
-    return slide_content.replace('<a:t>Summary</a:t>', f'<a:t>{_escape(header)}</a:t>', 1)
+    """Replace '개요' in Row 0 header."""
+    return slide_content.replace('<a:t>개요</a:t>', f'<a:t>{_escape(header)}</a:t>', 1)
 
 
 def register_hyperlinks(slide_xml_path, urls):
