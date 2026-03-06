@@ -1,6 +1,6 @@
 ---
 name: aws-whats-new-pptx
-description: "AWS What's New 공지 URL을 입력받아 한국어 요약 또는 번역 + PPTX 프레젠테이션을 생성합니다. 사용자가 AWS What's New URL(https://aws.amazon.com/about-aws/whats-new/...)을 1개 이상 제공하면 자동으로 트리거됩니다. 'AWS 새 기능 발표자료 만들어줘', 'What's New 슬라이드로 정리해줘', 'AWS 공지 프레젠테이션', 'whats-new pptx' 등의 요청에도 반응합니다. '번역해줘', '원문 번역', '전문 번역' 요청 시 원문 전체를 한국어로 번역하여 슬라이드를 생성합니다. AWS What's New URL이 포함된 모든 프레젠테이션 요청에 반드시 이 스킬을 사용하세요. URL이 aws.amazon.com/about-aws/whats-new/ 패턴이면 항상 트리거하세요. 사용자가 AWS 발표, 공지 요약, 새 기능 정리, 공지 번역을 요청할 때도 이 스킬이 적합합니다."
+description: "AWS What's New 공지 URL을 입력받아 한국어 요약 또는 번역 + PPTX 프레젠테이션을 생성합니다. 사용자가 AWS What's New URL(https://aws.amazon.com/about-aws/whats-new/... 또는 https://aws.amazon.com/ko/about-aws/whats-new/... 등 로케일 프리픽스 포함)을 1개 이상 제공하면 자동으로 트리거됩니다. 'AWS 새 기능 발표자료 만들어줘', 'What's New 슬라이드로 정리해줘', 'AWS 공지 프레젠테이션', 'whats-new pptx' 등의 요청에도 반응합니다. '번역해줘', '원문 번역', '전문 번역' 요청 시 원문 전체를 한국어로 번역하여 슬라이드를 생성합니다. AWS What's New URL이 포함된 모든 프레젠테이션 요청에 반드시 이 스킬을 사용하세요. URL에 aws.amazon.com/about-aws/whats-new/ 또는 aws.amazon.com/{locale}/about-aws/whats-new/ 패턴이 포함되면 항상 트리거하세요. 사용자가 AWS 발표, 공지 요약, 새 기능 정리, 공지 번역을 요청할 때도 이 스킬이 적합합니다."
 ---
 
 # AWS What's New → PPTX 생성 스킬
