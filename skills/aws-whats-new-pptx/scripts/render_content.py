@@ -249,7 +249,34 @@ def register_hyperlinks(slide_xml_path, urls):
     rels_path.write_text(rels_content, encoding='utf-8')
 
 
-def render_slide(slide_path, lines, font_size='auto', title=None, header=None, date=None):
+def replace_script(slide_xml_path, script_text):
+    """Replace {script} placeholder in the linked notesSlide."""
+    path = Path(slide_xml_path)
+    rels_path = path.parent / '_rels' / f'{path.name}.rels'
+    if not rels_path.exists():
+        return False
+
+    rels_content = rels_path.read_text(encoding='utf-8')
+    m = re.search(r'Target="([^"]*notesSlide[^"]*)"', rels_content)
+    if not m:
+        return False
+
+    notes_path = (path.parent / m.group(1)).resolve()
+    if not notes_path.exists():
+        return False
+
+    notes_content = notes_path.read_text(encoding='utf-8')
+    if '{script}' not in notes_content:
+        return False
+
+    escaped = _escape(script_text).replace('\n', '&#xA;')
+    notes_content = notes_content.replace('<a:t>{script}</a:t>', f'<a:t>{escaped}</a:t>')
+    notes_path.write_text(notes_content, encoding='utf-8')
+    print(f'Script inserted into {notes_path.name}')
+    return True
+
+
+def render_slide(slide_path, lines, font_size='auto', title=None, header=None, date=None, script=None):
     """One-shot render: title + header + date + Row 1 content + hyperlinks."""
     path = Path(slide_path)
     content = path.read_text(encoding='utf-8')
@@ -286,6 +313,9 @@ def render_slide(slide_path, lines, font_size='auto', title=None, header=None, d
     path.write_text(result, encoding='utf-8')
     register_hyperlinks(path, urls)
 
+    if script:
+        replace_script(path, script)
+
     non_empty = len([l for l in lines if l.strip() and not l.strip().startswith('유형:')])
     vl = estimate_visual_lines(lines, MAX_WIDTH_14PT if sz == 1400 else MAX_WIDTH_12PT)
     print(f'Rendered {non_empty} lines ({vl} visual) at {sz / 100:.0f}pt into {path.name}'
@@ -303,6 +333,7 @@ if __name__ == '__main__':
     parser.add_argument('--font-size', default='auto',
                         help='Font size: auto, 1400 (14pt), or 1200 (12pt)')
     parser.add_argument('--date', help='Date text (replaces {date} placeholder)')
+    parser.add_argument('--script', help='Script file for presenter notes (replaces {script})')
     args = parser.parse_args()
 
     if args.content_file == '-':
@@ -310,7 +341,11 @@ if __name__ == '__main__':
     else:
         lines = Path(args.content_file).read_text(encoding='utf-8').splitlines()
 
-    ok, sz, needs_split = render_slide(args.slide_xml, lines, args.font_size, args.title, args.header, args.date)
+    script_text = None
+    if args.script:
+        script_text = Path(args.script).read_text(encoding='utf-8')
+
+    ok, sz, needs_split = render_slide(args.slide_xml, lines, args.font_size, args.title, args.header, args.date, script_text)
     if needs_split:
         sys.exit(2)
     if not ok:

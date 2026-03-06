@@ -63,6 +63,14 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
 1. 원문 전체를 한국어로 번역 (원문 구조 유지, 기술 용어 병기)
 2. 자체 점검 체크리스트 수행
 
+**발표자 스크립트 생성 (두 모드 공통):**
+
+요약/번역 콘텐츠 생성 후, 각 슬라이드에 대한 발표자 스크립트도 함께 생성합니다:
+- 톤: AWS TAM이 고객에게 설명하듯 이해하기 쉬운 구어체
+- 슬라이드 내용을 기반으로 "왜 중요한지", "실무에서 어떻게 활용하는지" 맥락 추가 가능
+- 분량: 1~2분 분량 (약 200~400자)
+- 스크립트 파일은 `/tmp/script_slide{N}.txt`에 저장
+
 **진행 보고:**
 ```
 📝 Step 2/3: 구조화 요약을 생성하고 있습니다... (요약 모드)
@@ -94,9 +102,11 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
    # 요약 마크다운을 stdin으로 전달 (working/ 내부에 temp 파일 생성 금지)
    cat /tmp/content_slide2.dat | python scripts/render_content.py \
        working/ppt/slides/slide2.xml - \
-       --title "슬라이드 제목" --header "개요" --font-size auto
+       --title "슬라이드 제목" --header "개요" --font-size auto \
+       --script /tmp/script_slide2.txt
    ```
    - `--font-size auto`: 시각적 줄 수 기반 자동 판단 (≤23줄 14pt, ≤27줄 12pt)
+   - `--script`: 발표자 노트에 삽입할 스크립트 파일 (선택사항). notesSlide의 `{script}` placeholder를 교체
    - 하이퍼링크: URL이 자동으로 클릭 가능한 링크로 변환됨 (`_rels` 자동 등록)
    - `유형:` 줄: 자동 스킵됨
    - **SPLIT_NEEDED 처리 (exit code 2)**: 시각적 줄 수가 27줄을 초과하면 렌더링하지 않고 `SPLIT_NEEDED`를 출력합니다. 이 경우:

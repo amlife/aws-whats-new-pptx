@@ -110,12 +110,15 @@ def duplicate_slide(unpacked_dir: Path, source: str) -> None:
         shutil.copy2(source_rels, dest_rels)
 
         rels_content = dest_rels.read_text(encoding="utf-8")
-        rels_content = re.sub(
-            r'\s*<Relationship[^>]*Type="[^"]*notesSlide"[^>]*/>\s*',
-            "\n",
-            rels_content,
+
+        # Duplicate notesSlide if source has one
+        notes_match = re.search(
+            r'<Relationship[^>]*Type="[^"]*notesSlide"[^>]*Target="([^"]+)"[^>]*/>', rels_content
         )
-        dest_rels.write_text(rels_content, encoding="utf-8")
+        if notes_match:
+            _duplicate_notes_slide(unpacked_dir, notes_match.group(1), dest, rels_content, dest_rels)
+        else:
+            dest_rels.write_text(rels_content, encoding="utf-8")
 
     _add_to_content_types(unpacked_dir, dest)
 
@@ -125,6 +128,65 @@ def duplicate_slide(unpacked_dir: Path, source: str) -> None:
 
     _register_in_presentation(unpacked_dir, next_slide_id, rid)
     print(f"Created {dest} from {source}")
+
+
+def _duplicate_notes_slide(unpacked_dir: Path, source_target: str, dest_slide: str, rels_content: str, dest_rels: Path) -> None:
+    """Duplicate the notesSlide linked to the source slide."""
+    notes_dir = unpacked_dir / "ppt" / "notesSlides"
+    notes_rels_dir = notes_dir / "_rels"
+
+    # Resolve source notesSlide path (target is relative like ../notesSlides/notesSlide1.xml)
+    source_name = Path(source_target).name
+    source_notes = notes_dir / source_name
+
+    if not source_notes.exists():
+        # No notes file, just remove the reference
+        rels_content = re.sub(r'\s*<Relationship[^>]*Type="[^"]*notesSlide"[^>]*/>\s*', "\n", rels_content)
+        dest_rels.write_text(rels_content, encoding="utf-8")
+        return
+
+    # Determine next notesSlide number
+    existing = [int(m.group(1)) for f in notes_dir.glob("notesSlide*.xml")
+                if (m := re.match(r"notesSlide(\d+)\.xml", f.name))]
+    next_num = max(existing) + 1 if existing else 1
+    dest_name = f"notesSlide{next_num}.xml"
+
+    # Copy notes XML and update slide reference inside it
+    notes_content = source_notes.read_text(encoding="utf-8")
+    (notes_dir / dest_name).write_text(notes_content, encoding="utf-8")
+
+    # Copy notes rels and update slide target
+    source_notes_rels = notes_rels_dir / f"{source_name}.rels"
+    if source_notes_rels.exists():
+        notes_rels_content = source_notes_rels.read_text(encoding="utf-8")
+        notes_rels_content = notes_rels_content.replace(
+            f"../slides/{Path(source_target).parent.name and ''}{source_name.replace('notesSlide', 'slide').replace('Slide', '')}",
+            f"../slides/{dest_slide}",
+        )
+        # Simpler: just replace any slide reference target
+        notes_rels_content = re.sub(
+            r'(Target="../slides/)slide\d+\.xml"',
+            f'\\1{dest_slide}"',
+            notes_rels_content,
+        )
+        notes_rels_dir.mkdir(exist_ok=True)
+        (notes_rels_dir / f"{dest_name}.rels").write_text(notes_rels_content, encoding="utf-8")
+
+    # Update slide rels to point to new notesSlide
+    rels_content = re.sub(
+        r'(Target="../notesSlides/)notesSlide\d+\.xml"',
+        f'\\1{dest_name}"',
+        rels_content,
+    )
+    dest_rels.write_text(rels_content, encoding="utf-8")
+
+    # Register in Content_Types
+    ct_path = unpacked_dir / "[Content_Types].xml"
+    ct = ct_path.read_text(encoding="utf-8")
+    override = f'<Override PartName="/ppt/notesSlides/{dest_name}" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>'
+    if f"/ppt/notesSlides/{dest_name}" not in ct:
+        ct = ct.replace("</Types>", f"  {override}\n</Types>")
+        ct_path.write_text(ct, encoding="utf-8")
 
 
 def _add_to_content_types(unpacked_dir: Path, dest: str) -> None:

@@ -247,3 +247,20 @@ bold 텍스트: `<a:rPr>` 에 `b="1"` 추가
 | slideLayout2.xml | Title Slide 2A | slide1.xml이 참조 (Title Slide) |
 | slideLayout3.xml | Three Content | slide2.xml이 참조 (콘텐츠 슬라이드) |
 | slideLayout4.xml | Title and Bulleted Content | 사용 안 함 |
+
+---
+
+## 발표자 노트 (notesSlide)
+
+### notesSlide1.xml — slide2에 연결
+
+slide2(콘텐츠 슬라이드)에 발표자 노트가 연결되어 있습니다. `add_slide.py`로 슬라이드를 복제하면 notesSlide도 함께 복제됩니다.
+
+| 항목 | 값 |
+|------|-----|
+| Placeholder | "Notes Placeholder 2" (type="body", idx="1") |
+| 샘플 텍스트 | `{script}` |
+
+### 스크립트 교체
+
+`render_content.py --script /tmp/script.txt` 옵션으로 `{script}` placeholder를 발표자 스크립트로 교체합니다.
