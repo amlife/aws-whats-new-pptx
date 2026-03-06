@@ -15,7 +15,9 @@ Usage:
 
 Content format:
     - **bold text** → bold run
+    - ## or ### heading → bold run (markers stripped)
     - • bullet text → bullet point
+    - - bullet text → bullet point (converted to •)
     - empty line → blank line
     - Lines starting with "유형:" → skipped (internal metadata)
     - URLs (https://...) → clickable hyperlinks
@@ -107,9 +109,17 @@ def render_txbody(lines, sz):
         if stripped.startswith('유형:'):
             continue
 
-        if stripped.startswith('**') and stripped.endswith('**'):
+        if stripped.startswith('##'):
+            text = stripped.lstrip('#').strip()
+            parts.append(_render_line_with_links(text, sz, bold=True, urls=urls))
+            parts.append(_br(sz))
+        elif stripped.startswith('**') and stripped.endswith('**'):
             text = stripped[2:-2]
             parts.append(_render_line_with_links(text, sz, bold=True, urls=urls))
+            parts.append(_br(sz))
+        elif stripped.startswith('- '):
+            text = '• ' + stripped[2:]
+            parts.append(_render_line_with_links(text, sz, bold=False, urls=urls))
             parts.append(_br(sz))
         else:
             parts.append(_render_line_with_links(stripped, sz, bold=False, urls=urls))
