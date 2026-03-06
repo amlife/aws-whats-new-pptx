@@ -30,6 +30,12 @@ import sys
 from pathlib import Path
 
 URL_PATTERN = re.compile(r'(https?://[^\s<>"]+)')
+MD_LINK_PATTERN = re.compile(r'\[([^\]]+)\]\((https?://[^\s)]+)\)')
+LINK_PATTERN = re.compile(
+    r'\[([^\]]+)\]\((https?://[^\s)]+)\)'  # [text](url) markdown link
+    r'|'
+    r'(https?://[^\s<>"]+)'                 # bare URL
+)
 
 EMBER_FONTS = (
     '<a:latin typeface="Amazon Ember" panose="020B0603020204020204" pitchFamily="34" charset="0"/>'
@@ -65,18 +71,24 @@ def _run(text, sz, bold=False, hlink_rid=None):
 
 
 def _render_line_with_links(text, sz, bold, urls):
-    """Split a line into text and URL segments, creating hyperlink runs for URLs."""
+    """Split a line into text, markdown links, and bare URL segments."""
     parts = []
     last_end = 0
 
-    for m in URL_PATTERN.finditer(text):
+    for m in LINK_PATTERN.finditer(text):
         if m.start() > last_end:
             parts.append(_run(text[last_end:m.start()], sz, bold))
 
-        url = m.group(0)
         rid = f'rId{100 + len(urls)}'
+        if m.group(1) is not None:
+            # Markdown link: [display](url)
+            display, url = m.group(1), m.group(2)
+        else:
+            # Bare URL
+            display = url = m.group(3)
+
         urls.append((rid, url))
-        parts.append(_run(url, sz, bold, hlink_rid=rid))
+        parts.append(_run(display, sz, bold, hlink_rid=rid))
         last_end = m.end()
 
     if last_end < len(text):
@@ -85,14 +97,39 @@ def _render_line_with_links(text, sz, bold, urls):
     return ''.join(parts)
 
 
+MAX_WIDTH_14PT = 135  # visual width units per line at 14pt (CJK=2, ASCII=1)
+MAX_WIDTH_12PT = 157  # visual width units per line at 12pt
+MAX_LINES_14PT = 23   # max visual lines at 14pt (measured from slide)
+MAX_LINES_12PT = 27   # max visual lines at 12pt (proportional estimate)
+
+
+def _visual_width(text):
+    """Estimate visual width: CJK/fullwidth=2, ASCII/halfwidth=1."""
+    return sum(2 if ord(ch) > 0x7F else 1 for ch in text)
+
+
+def estimate_visual_lines(lines, max_width):
+    """Estimate visual line count on slide, accounting for text wrapping."""
+    import math
+    total = 0
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith('유형:'):
+            continue
+        if not stripped:
+            total += 1
+        else:
+            total += max(1, math.ceil(_visual_width(stripped) / max_width))
+    return total
+
+
 def determine_font_size(lines):
-    """Auto-determine font size based on content line count."""
-    count = len([l for l in lines if l.strip()])
-    if count <= 25:
-        return 1400
-    if count <= 35:
-        return 1200
-    return 1400  # >35 lines: use 14pt with 2-slide split (handled externally)
+    """Auto-determine font size and split need based on visual line count."""
+    if estimate_visual_lines(lines, MAX_WIDTH_14PT) <= MAX_LINES_14PT:
+        return 1400, False
+    if estimate_visual_lines(lines, MAX_WIDTH_12PT) <= MAX_LINES_12PT:
+        return 1200, False
+    return 1400, True  # needs split into 2 slides
 
 
 def extract_date(lines):
@@ -217,11 +254,19 @@ def render_slide(slide_path, lines, font_size='auto', title=None, header=None, d
     path = Path(slide_path)
     content = path.read_text(encoding='utf-8')
 
-    sz = determine_font_size(lines) if font_size == 'auto' else int(font_size)
-
-    # Extract date from content if not explicitly provided
+    # Extract date from content first (removes 게시일 line + trailing blank)
     extracted_date, lines = extract_date(lines)
     date_value = date or extracted_date
+
+    if font_size == 'auto':
+        sz, needs_split = determine_font_size(lines)
+    else:
+        sz, needs_split = int(font_size), False
+
+    if needs_split:
+        vl = estimate_visual_lines(lines, MAX_WIDTH_14PT)
+        print(f'SPLIT_NEEDED: {vl} visual lines (14pt max {MAX_LINES_14PT}, 12pt max {MAX_LINES_12PT})')
+        return False, sz, True
 
     if title:
         content = replace_title(content, title)
@@ -236,15 +281,16 @@ def render_slide(slide_path, lines, font_size='auto', title=None, header=None, d
     result = replace_row1(content, txbody)
     if result is None:
         print(f'Error: Could not find Row 1 <a:txBody> in {slide_path}', file=sys.stderr)
-        return False, sz
+        return False, sz, False
 
     path.write_text(result, encoding='utf-8')
     register_hyperlinks(path, urls)
 
     non_empty = len([l for l in lines if l.strip() and not l.strip().startswith('유형:')])
-    print(f'Rendered {non_empty} lines at {sz / 100:.0f}pt into {path.name}'
+    vl = estimate_visual_lines(lines, MAX_WIDTH_14PT if sz == 1400 else MAX_WIDTH_12PT)
+    print(f'Rendered {non_empty} lines ({vl} visual) at {sz / 100:.0f}pt into {path.name}'
           f' ({len(urls)} hyperlinks)')
-    return True, sz
+    return True, sz, False
 
 
 if __name__ == '__main__':
@@ -264,6 +310,8 @@ if __name__ == '__main__':
     else:
         lines = Path(args.content_file).read_text(encoding='utf-8').splitlines()
 
-    ok, sz = render_slide(args.slide_xml, lines, args.font_size, args.title, args.header, args.date)
+    ok, sz, needs_split = render_slide(args.slide_xml, lines, args.font_size, args.title, args.header, args.date)
+    if needs_split:
+        sys.exit(2)
     if not ok:
         sys.exit(1)

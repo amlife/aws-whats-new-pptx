@@ -80,9 +80,13 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
        working/ppt/slides/slide2.xml - \
        --title "슬라이드 제목" --header "개요" --font-size auto
    ```
-   - `--font-size auto`: 줄 수 기반 자동 판단 (~25줄 14pt, ~35줄 12pt)
+   - `--font-size auto`: 시각적 줄 수 기반 자동 판단 (≤23줄 14pt, ≤27줄 12pt)
    - 하이퍼링크: URL이 자동으로 클릭 가능한 링크로 변환됨 (`_rels` 자동 등록)
    - `유형:` 줄: 자동 스킵됨
+   - **SPLIT_NEEDED 처리 (exit code 2)**: 시각적 줄 수가 27줄을 초과하면 렌더링하지 않고 `SPLIT_NEEDED`를 출력합니다. 이 경우:
+     1. 요약 콘텐츠를 섹션 헤더(`**...**`) 경계에서 자연스럽게 2개 파트로 분할 (앞: 개요+상세 전반, 뒤: 상세 후반+관련 링크)
+     2. `python scripts/add_slide.py working/ slide{N}.xml`으로 추가 슬라이드 생성
+     3. 각 파트를 별도 슬라이드에 `--font-size 1400`으로 렌더링 (두 번째 슬라이드 `--title`에 "(계속)" 추가 가능)
 5. `python scripts/clean.py working/`
 6. `python scripts/office/pack.py working/ output.pptx --original assets/whats_new_template.pptx`
 7. `rm -rf working/` — PPTX 생성 완료 후 working 디렉토리 정리
