@@ -27,6 +27,7 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
 1. 한국어(`/ko/`) URL 우선 → 실패 시 영어 URL 폴백
 2. `web_fetch`로 본문 텍스트 추출
 3. 본문 내 참조 링크(공식 문서, 가격 페이지 등)도 `web_fetch`로 보강 정보 수집
+4. 페이지의 `<h1>` 타이틀을 추출하여 슬라이드 제목으로 사용한다. 한국어(`/ko/`) 페이지의 타이틀은 그대로 사용하고, 영어 페이지의 타이틀은 한국어로 번역한다. 임의로 축약하거나 재작성하지 않는다.
 
 **MCP 도구 활용 (사용 가능한 경우):**
 - `aws___search_documentation`: 서비스/기능 관련 문서 검색
@@ -65,19 +66,29 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
 
 **발표자 스크립트 생성 (두 모드 공통):**
 
-요약/번역 콘텐츠 생성 후, 각 슬라이드에 대한 발표자 스크립트도 함께 생성합니다:
+요약/번역 콘텐츠 생성 후, 각 슬라이드에 대한 발표자 스크립트를 반드시 생성합니다:
 - 톤: AWS TAM이 고객에게 설명하듯 이해하기 쉬운 구어체
-- 슬라이드 내용을 기반으로 "왜 중요한지", "실무에서 어떻게 활용하는지" 맥락 추가 가능
+- 슬라이드 내용을 기반으로 "왜 중요한지", "실무에서 어떻게 활용하는지" 맥락을 추가한다
 - 분량: 1~2분 분량 (약 200~400자)
 - 스크립트 파일은 `/tmp/script_slide{N}.txt`에 저장
+
+**임시 파일 정리 (Step 2 시작 전):**
+`rm -f /tmp/script_slide*.txt` — 이전 실행의 잔여 파일을 제거하여 게이트 검증 오류를 방지한다.
+
+**각 URL 처리 워크플로우:**
+1. 요약/번역 생성 → `/tmp/content_slide{N}.dat` 저장
+2. 발표자 스크립트 생성 → `/tmp/script_slide{N}.txt` 저장
+
+**스크립트 검증 (Step 3 진행 전 필수):**
+각 URL에 대응하는 `/tmp/script_slide{N}.txt`가 존재하는지 개별 확인한다 (N = 슬라이드 번호, slide2부터 시작). 누락된 파일이 있으면 해당 URL의 스크립트를 재생성한 후 Step 3으로 진행한다.
 
 **진행 보고:**
 ```
 📝 Step 2/3: 구조화 요약을 생성하고 있습니다... (요약 모드)
-  → [URL 1] T1a 신규 기능 추가 — 요약 완료
+  → [URL 1] T1a 신규 기능 추가 — 요약 완료, 스크립트 완료
 
 📝 Step 2/3: 원문을 한국어로 번역하고 있습니다... (번역 모드)
-  → [URL 1] T1a 신규 기능 추가 — 번역 완료
+  → [URL 1] 번역 완료, 스크립트 완료
 ```
 
 ### Step 3: PPTX 렌더링
@@ -102,17 +113,19 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
    # 요약 마크다운을 stdin으로 전달 (working/ 내부에 temp 파일 생성 금지)
    cat /tmp/content_slide2.dat | python scripts/render_content.py \
        working/ppt/slides/slide2.xml - \
-       --title "슬라이드 제목" --header "개요" --font-size auto \
+       --title "Step 1에서 추출한 원문 타이틀" --header "개요" --font-size auto \
        --script /tmp/script_slide2.txt
    ```
    - `--font-size auto`: 시각적 줄 수 기반 자동 판단 (≤23줄 14pt, ≤27줄 12pt)
-   - `--script`: 발표자 노트에 삽입할 스크립트 파일 (선택사항). notesSlide의 `{script}` placeholder를 교체
+   - `--title`: Step 1에서 추출한 원문 페이지 `<h1>` 타이틀을 그대로 사용한다. 임의 축약 금지.
+   - `--script`: 발표자 노트에 삽입할 스크립트 파일. 모든 콘텐츠 슬라이드에 반드시 `--script` 옵션을 포함한다 (`add_slide.py`가 notesSlide를 복제하므로 `--script` 없이 렌더링하면 `{script}` 텍스트가 발표자 노트에 그대로 남는다)
    - 하이퍼링크: URL이 자동으로 클릭 가능한 링크로 변환됨 (`_rels` 자동 등록)
    - `유형:` 줄: 자동 스킵됨
    - **SPLIT_NEEDED 처리 (exit code 2)**: 시각적 줄 수가 27줄을 초과하면 렌더링하지 않고 `SPLIT_NEEDED`를 출력합니다. 이 경우:
      1. 요약 콘텐츠를 섹션 헤더(`**...**`) 경계에서 자연스럽게 2개 파트로 분할 (앞: 개요+상세 전반, 뒤: 상세 후반+관련 링크)
      2. `python scripts/add_slide.py working/ slide{N}.xml`으로 추가 슬라이드 생성
      3. 각 파트를 별도 슬라이드에 `--font-size 1400`으로 렌더링 (두 번째 슬라이드 `--title`에 "(계속)" 추가 가능)
+     4. 두 번째 슬라이드("(계속)")용 스크립트를 별도 생성한다. 후반부 콘텐츠 기반으로 1~2분 분량(200~400자)을 작성하고, 도입부에 "(이어서)" 연결 멘트를 포함한다. `{script}` placeholder 잔존 방지를 위해 split된 슬라이드에도 반드시 `--script`를 적용한다.
 5. `python scripts/clean.py working/`
 6. `python scripts/office/pack.py working/ output.pptx --original assets/whats_new_template.pptx`
 7. `rm -rf working/` — PPTX 생성 완료 후 working 디렉토리 정리
