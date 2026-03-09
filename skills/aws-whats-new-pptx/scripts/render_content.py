@@ -22,6 +22,7 @@ Content format:
     - Lines starting with "유형:" → skipped (internal metadata)
     - ## 개요 or ### 개요 → skipped (Row 0 header duplicate)
     - URLs (https://...) → clickable hyperlinks
+    - ==highlighted text== → highlighted run (light orange #FFD2B2)
     - {date} placeholder in slide → replaced via --date option
 """
 
@@ -37,6 +38,8 @@ LINK_PATTERN = re.compile(
     r'|'
     r'(https?://[^\s<>"]+)'                 # bare URL
 )
+HIGHLIGHT_PATTERN = re.compile(r'==((?:(?!==).)+)==')
+HIGHLIGHT_COLOR = 'FFD2B2'
 
 EMBER_FONTS = (
     '<a:latin typeface="Amazon Ember" panose="020B0603020204020204" pitchFamily="34" charset="0"/>'
@@ -57,35 +60,39 @@ def _escape(text):
     )
 
 
-def _rpr(sz, bold=False, hlink_rid=None):
+def _rpr(sz, bold=False, hlink_rid=None, highlight=False):
     b = ' b="1"' if bold else ''
     hlink = f'<a:hlinkClick xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="{hlink_rid}"/>' if hlink_rid else ''
-    return f'<a:rPr lang="ko-KR" sz="{sz}"{b} dirty="0">{hlink}{EMBER_FONTS}</a:rPr>'
+    hl = f'<a:highlight><a:srgbClr val="{HIGHLIGHT_COLOR}"/></a:highlight>' if highlight else ''
+    return f'<a:rPr lang="ko-KR" sz="{sz}"{b} dirty="0">{hlink}{hl}{EMBER_FONTS}</a:rPr>'
 
 
 def _br(sz):
     return f'<a:br>{_rpr(sz)}</a:br>'
 
 
-def _run(text, sz, bold=False, hlink_rid=None):
-    return f'<a:r>{_rpr(sz, bold, hlink_rid)}<a:t>{_escape(text)}</a:t></a:r>'
+def _run(text, sz, bold=False, hlink_rid=None, highlight=False):
+    return f'<a:r>{_rpr(sz, bold, hlink_rid, highlight)}<a:t>{_escape(text)}</a:t></a:r>'
 
 
-def _render_line_with_links(text, sz, bold, urls):
-    """Split a line into text, markdown links, and bare URL segments."""
+def _render_line_with_links(text, sz, bold, urls, allow_highlight=True):
+    """Split a line into text, markdown links, bare URL, and highlight segments.
+
+    Pass 1: split by LINK_PATTERN (links vs non-links).
+    Pass 2: in non-link segments, split by HIGHLIGHT_PATTERN if allowed.
+    Bold sections pass allow_highlight=False; == markers are stripped as plain bold text.
+    """
     parts = []
     last_end = 0
 
     for m in LINK_PATTERN.finditer(text):
         if m.start() > last_end:
-            parts.append(_run(text[last_end:m.start()], sz, bold))
+            parts += _render_segment(text[last_end:m.start()], sz, bold, allow_highlight)
 
         rid = f'rId{100 + len(urls)}'
         if m.group(1) is not None:
-            # Markdown link: [display](url)
             display, url = m.group(1), m.group(2)
         else:
-            # Bare URL
             display = url = m.group(3)
 
         urls.append((rid, url))
@@ -93,9 +100,28 @@ def _render_line_with_links(text, sz, bold, urls):
         last_end = m.end()
 
     if last_end < len(text):
-        parts.append(_run(text[last_end:], sz, bold))
+        parts += _render_segment(text[last_end:], sz, bold, allow_highlight)
 
     return ''.join(parts)
+
+
+def _render_segment(text, sz, bold, allow_highlight):
+    """Render a non-link text segment, splitting highlights if allowed."""
+    if not allow_highlight:
+        # Strip == markers, render as plain (bold) text
+        text = HIGHLIGHT_PATTERN.sub(r'\1', text)
+        return [_run(text, sz, bold)] if text else []
+
+    parts = []
+    last = 0
+    for m in HIGHLIGHT_PATTERN.finditer(text):
+        if m.start() > last:
+            parts.append(_run(text[last:m.start()], sz, bold))
+        parts.append(_run(m.group(1), sz, bold, highlight=True))
+        last = m.end()
+    if last < len(text):
+        parts.append(_run(text[last:], sz, bold))
+    return parts
 
 
 MAX_WIDTH_14PT = 135  # visual width units per line at 14pt (CJK=2, ASCII=1)
@@ -174,11 +200,11 @@ def render_txbody(lines, sz):
             text = stripped.lstrip('#').strip()
             if text in ('개요', '상세 내용'):
                 continue
-            parts.append(_render_line_with_links(text, sz, bold=True, urls=urls))
+            parts.append(_render_line_with_links(text, sz, bold=True, urls=urls, allow_highlight=False))
             parts.append(_br(sz))
         elif stripped.startswith('**') and stripped.endswith('**'):
             text = stripped[2:-2]
-            parts.append(_render_line_with_links(text, sz, bold=True, urls=urls))
+            parts.append(_render_line_with_links(text, sz, bold=True, urls=urls, allow_highlight=False))
             parts.append(_br(sz))
         elif stripped.startswith('- '):
             text = '• ' + stripped[2:]

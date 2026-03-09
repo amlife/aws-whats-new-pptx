@@ -231,6 +231,7 @@ bold 텍스트: `<a:rPr>` 에 `b="1"` 추가
 
 - `### 헤더` → `<a:r>` with `b="1"` (bold) + `<a:br>`
 - `[표시텍스트](URL)` → `<a:r>` with `<a:hlinkClick>` + `<a:t>표시텍스트</a:t>` (URL은 `_rels`에 등록)
+- `==하이라이트 텍스트==` → `<a:r>` with `<a:highlight><a:srgbClr val="FFD2B2"/></a:highlight>` in `<a:rPr>`
 - `- 불릿 항목` → `<a:r>` with `<a:t>• {텍스트}</a:t>` + `<a:br>`
 - `| 테이블 |` → 각 행을 `<a:r>` + `<a:br>`로 변환
 - 빈 줄 → `<a:br>` 2개 연속
