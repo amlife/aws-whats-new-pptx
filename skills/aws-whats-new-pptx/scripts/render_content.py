@@ -20,6 +20,7 @@ Content format:
     - - bullet text → bullet point (converted to •)
     - empty line → blank line
     - Lines starting with "유형:" → skipped (internal metadata)
+    - ## 개요 or ### 개요 → skipped (Row 0 header duplicate)
     - URLs (https://...) → clickable hyperlinks
     - {date} placeholder in slide → replaced via --date option
 """
@@ -152,6 +153,10 @@ def extract_date(lines):
 
 def render_txbody(lines, sz):
     """Convert content lines to XML <a:txBody> for Row 1."""
+    # Strip leading 유형: lines and blank lines to prevent empty <a:br> at top
+    while lines and (not lines[0].strip() or lines[0].strip().startswith('유형:')):
+        lines.pop(0)
+
     parts = ['<a:txBody><a:bodyPr/><a:lstStyle/><a:p>']
     urls = []
 
@@ -167,6 +172,8 @@ def render_txbody(lines, sz):
 
         if stripped.startswith('##'):
             text = stripped.lstrip('#').strip()
+            if text in ('개요', '상세 내용'):
+                continue
             parts.append(_render_line_with_links(text, sz, bold=True, urls=urls))
             parts.append(_br(sz))
         elif stripped.startswith('**') and stripped.endswith('**'):

@@ -53,7 +53,7 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
 
 각 URL의 수집된 콘텐츠를 summary-agent의 규칙에 따라:
 1. 유형 판정 (T1a~T6, 우선순위 기반) → 라벨로 표기
-2. 개요 + 상세 내용 + 관련 링크 구조의 한국어 마크다운 요약 생성
+2. 개요 + 본문 + 관련 링크 구조의 한국어 마크다운 요약 생성
 3. 자체 점검 체크리스트 수행
 
 #### 번역 모드
@@ -104,6 +104,7 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
 각 URL당 1장의 콘텐츠 슬라이드를 생성합니다. 콘텐츠가 많으면 2장까지 확장 가능합니다.
 
 **렌더링 워크플로우:**
+0. **사용자 CWD 확인 (필수)**: `pwd` 명령을 실행하고, 그 출력값을 이후 출력 경로의 prefix로 사용한다. 이 값을 추측하거나 이전 대화에서 유추하지 않는다. 반드시 `pwd` 실행 결과를 그대로 사용한다.
 1. `python scripts/office/unpack.py assets/whats_new_template.pptx /tmp/working/`
 2. 콘텐츠 슬라이드 복제: URL 수 - 1만큼 `python scripts/add_slide.py /tmp/working/ slide2.xml` 반복 (presentation.xml에 자동 등록됨)
 3. Title Slide 편집 (slide1.xml): Edit 도구로 `ctrTitle`의 `<a:t>` 교체
@@ -122,18 +123,19 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
    - 하이퍼링크: URL이 자동으로 클릭 가능한 링크로 변환됨 (`_rels` 자동 등록)
    - `유형:` 줄: 자동 스킵됨
    - **SPLIT_NEEDED 처리 (exit code 2)**: 시각적 줄 수가 27줄을 초과하면 렌더링하지 않고 `SPLIT_NEEDED`를 출력합니다. 이 경우:
-     1. 요약 콘텐츠를 섹션 헤더(`**...**`) 경계에서 자연스럽게 2개 파트로 분할 (앞: 개요+상세 전반, 뒤: 상세 후반+관련 링크)
+     1. 요약 콘텐츠를 섹션 헤더(`**...**`) 경계에서 자연스럽게 2개 파트로 분할 (앞: 개요+본문 전반, 뒤: 본문 후반+관련 링크)
      2. `python scripts/add_slide.py /tmp/working/ slide{N}.xml`으로 추가 슬라이드 생성
      3. 각 파트를 별도 슬라이드에 `--font-size 1400`으로 렌더링 (두 번째 슬라이드 `--title`에 "(계속)" 추가 가능)
      4. 두 번째 슬라이드("(계속)")용 스크립트를 별도 생성한다. 후반부 콘텐츠 기반으로 1~2분 분량(200~400자)을 작성하고, 도입부에 "(이어서)" 연결 멘트를 포함한다. `{script}` placeholder 잔존 방지를 위해 split된 슬라이드에도 반드시 `--script`를 적용한다.
 5. **출력 파일명 결정** (게시일은 본문의 Posted on 기준):
+       - 출력 파일은 Step 0에서 `pwd`로 확인한 경로에 저장한다.
        - 1건: `AWS_WhatsNew_{YYYYMM}_{서비스명}.pptx`
        - 여러 건 단일 월: `AWS_WhatsNew_{YYYYMM}.pptx`
        - 여러 건 여러 월: `AWS_WhatsNew_{시작YYYYMM}_{종료YYYYMM}.pptx`
        - 서비스명: 공지 제목의 첫 번째 AWS 서비스명을 사용한다. 영숫자와 언더스코어만 허용하고 나머지 문자는 제거한다 (예: "Amazon RDS" → `Amazon_RDS`, "AWS WAF" → `AWS_WAF`).
-       - 덮어쓰기 방지: 동일 파일명이 이미 존재하면 `_1`, `_2` ... 순번을 붙인다.
+       - 덮어쓰기 방지: `{Step 0의 pwd 경로}/{OUTPUT}` 에 동일 파일명이 이미 존재하면 `_1`, `_2` ... 순번을 붙인다.
 6. `python scripts/clean.py /tmp/working/`
-7. `python scripts/office/pack.py /tmp/working/ AWS_WhatsNew_202602_Amazon_RDS.pptx --original assets/whats_new_template.pptx`
+7. `python scripts/office/pack.py /tmp/working/ "{Step 0의 pwd 경로}/AWS_WhatsNew_202602_Amazon_RDS.pptx" --original assets/whats_new_template.pptx`
 8. `rm -rf /tmp/working/` — PPTX 생성 완료 후 working 디렉토리 정리
 
 **주의사항:**
