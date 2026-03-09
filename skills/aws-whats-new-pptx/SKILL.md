@@ -93,15 +93,15 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
 각 URL당 1장의 콘텐츠 슬라이드를 생성합니다. 콘텐츠가 많으면 2장까지 확장 가능합니다.
 
 **렌더링 워크플로우:**
-1. `python scripts/office/unpack.py assets/whats_new_template.pptx working/`
-2. 콘텐츠 슬라이드 복제: URL 수 - 1만큼 `python scripts/add_slide.py working/ slide2.xml` 반복 (presentation.xml에 자동 등록됨)
+1. `python scripts/office/unpack.py assets/whats_new_template.pptx /tmp/working/`
+2. 콘텐츠 슬라이드 복제: URL 수 - 1만큼 `python scripts/add_slide.py /tmp/working/ slide2.xml` 반복 (presentation.xml에 자동 등록됨)
 3. Title Slide 편집 (slide1.xml): Edit 도구로 `ctrTitle`의 `<a:t>` 교체
    - 서브타이틀 추가 권장: "2026년 2월" 또는 "N건의 AWS 업데이트" 등 맥락 (template-spec.md의 서브타이틀 XML 참조)
 4. 각 콘텐츠 슬라이드를 `render_content.py`로 원스톱 렌더링:
    ```bash
-   # 요약 마크다운을 stdin으로 전달 (working/ 내부에 temp 파일 생성 금지)
+   # 요약 마크다운을 stdin으로 전달 (/tmp/working/ 내부에 temp 파일 생성 금지)
    cat /tmp/content_slide2.dat | python scripts/render_content.py \
-       working/ppt/slides/slide2.xml - \
+       /tmp/working/ppt/slides/slide2.xml - \
        --title "슬라이드 제목" --header "개요" --font-size auto \
        --script /tmp/script_slide2.txt
    ```
@@ -111,14 +111,20 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
    - `유형:` 줄: 자동 스킵됨
    - **SPLIT_NEEDED 처리 (exit code 2)**: 시각적 줄 수가 27줄을 초과하면 렌더링하지 않고 `SPLIT_NEEDED`를 출력합니다. 이 경우:
      1. 요약 콘텐츠를 섹션 헤더(`**...**`) 경계에서 자연스럽게 2개 파트로 분할 (앞: 개요+상세 전반, 뒤: 상세 후반+관련 링크)
-     2. `python scripts/add_slide.py working/ slide{N}.xml`으로 추가 슬라이드 생성
+     2. `python scripts/add_slide.py /tmp/working/ slide{N}.xml`으로 추가 슬라이드 생성
      3. 각 파트를 별도 슬라이드에 `--font-size 1400`으로 렌더링 (두 번째 슬라이드 `--title`에 "(계속)" 추가 가능)
-5. `python scripts/clean.py working/`
-6. `python scripts/office/pack.py working/ output.pptx --original assets/whats_new_template.pptx`
-7. `rm -rf working/` — PPTX 생성 완료 후 working 디렉토리 정리
+5. **출력 파일명 결정** (게시일은 본문의 Posted on 기준):
+       - 1건: `AWS_WhatsNew_{YYYYMM}_{서비스명}.pptx`
+       - 여러 건 단일 월: `AWS_WhatsNew_{YYYYMM}.pptx`
+       - 여러 건 여러 월: `AWS_WhatsNew_{시작YYYYMM}_{종료YYYYMM}.pptx`
+       - 서비스명: 공지 제목의 첫 번째 AWS 서비스명을 사용한다. 영숫자와 언더스코어만 허용하고 나머지 문자는 제거한다 (예: "Amazon RDS" → `Amazon_RDS`, "AWS WAF" → `AWS_WAF`).
+       - 덮어쓰기 방지: 동일 파일명이 이미 존재하면 `_1`, `_2` ... 순번을 붙인다.
+6. `python scripts/clean.py /tmp/working/`
+7. `python scripts/office/pack.py /tmp/working/ AWS_WhatsNew_202602_Amazon_RDS.pptx --original assets/whats_new_template.pptx`
+8. `rm -rf /tmp/working/` — PPTX 생성 완료 후 working 디렉토리 정리
 
 **주의사항:**
-- 콘텐츠 파일은 `working/` 외부(예: `/tmp/`)에 생성 (pack.py 검증 시 "Unreferenced file" 에러 방지)
+- 콘텐츠 파일은 `/tmp/working/` 외부에 생성한다 (content.dat, script.txt 등은 `/tmp/` 직하에 저장. pack.py 검증 시 "Unreferenced file" 에러 방지)
 - 슬라이드가 여러 장이면 서브에이전트로 병렬 렌더링 가능 (각 slide{N}.xml은 독립 파일)
 
 **진행 보고:**
@@ -127,7 +133,7 @@ https://aws.amazon.com/about-aws/whats-new/YYYY/MM/slug/
   → [슬라이드 1] Title Slide — 완료
   → [슬라이드 2] 콘텐츠 (URL 1) — 완료
   → [슬라이드 3] 콘텐츠 (URL 2) — 완료
-  → PPTX 렌더링 완료: output.pptx
+  → PPTX 렌더링 완료: AWS_WhatsNew_202602_Amazon_RDS.pptx
 ```
 
 ---
